@@ -1,161 +1,88 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:transfer_bank/widgets/bar.dart';
 import 'package:transfer_bank/widgets/bottombar.dart';
 
 class SupportPage extends StatelessWidget {
   const SupportPage({super.key});
 
+  static Future<void> openLink(String url) async {
+    final Uri uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else {
+      debugPrint('Gagal membuka link: $url');
+    }
+  }
+
+  Widget buildSupportItem(String label, IconData icon, Color color, String url) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+      child: GestureDetector(
+        onTap: () => openLink(url),
+        child: Container(
+          height: 100,
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(15),
+          ),
+          child: Center(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(icon, color: Colors.white),
+                const SizedBox(width: 10),
+                Text(
+                  label,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontFamily: 'Poppins',
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: Bar(title: 'Support'),
-      body: Center(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.only(top: 16, left: 16, right: 16, bottom: 8),
-              child: Container(
-                child: GestureDetector(
-                  onTap: () {
-                    
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          'Email',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontFamily: 'Poppins',
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        
-                      ],
-                    ),
-                  ),
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.blue[200],
-                  borderRadius: BorderRadius.circular(15),
-                ),
-                height: 100,
-                width: 500,
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-              child: Container(
-                child: GestureDetector(
-                  onTap: () {
-                    
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          'WhatsApp',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontFamily: 'Poppins',
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        
-                      ],
-                    ),
-                  ),
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.blue[200],
-                  borderRadius: BorderRadius.circular(15),
-                ),
-                height: 100,
-                width: 500,
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-              child: Container(
-                child: GestureDetector(
-                  onTap: () {
-                    
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          'Telepon',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontFamily: 'Poppins',
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        
-                      ],
-                    ),
-                  ),
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.blue[200],
-                  borderRadius: BorderRadius.circular(15),
-                ),
-                height: 100,
-                width: 500,
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-              child: Container(
-                child: GestureDetector(
-                  onTap: () {
-                    
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          'Telegram',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontFamily: 'Poppins',
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        
-                      ],
-                    ),
-                  ),
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.blue[200],
-                  borderRadius: BorderRadius.circular(15),
-                ),
-                height: 100,
-                width: 500,
-              ),
-            ),
-          ],
-        ),
+      appBar: const Bar(title: 'Support'),
+      body: ListView(
+        children: [
+          buildSupportItem(
+            'Email',
+            Icons.email,
+            Colors.blue.shade400,
+            'mailto:lutfizadeh5@gmail.com',
+          ),
+          buildSupportItem(
+            'WhatsApp',
+            Icons.chat,
+            Colors.green,
+            'https://wa.me/6285156817148',
+          ),
+          buildSupportItem(
+            'Telepon',
+            Icons.phone,
+            Colors.orange,
+            'tel:+62851568171488',
+          ),
+          buildSupportItem(
+            'Telegram',
+            Icons.send,
+            Colors.blue.shade700,
+            'https://t.me/Lutfizadeh',
+          ),
+        ],
       ),
-      bottomNavigationBar: BottomBar(),
+      bottomNavigationBar: const BottomBar(),
     );
   }
 }
