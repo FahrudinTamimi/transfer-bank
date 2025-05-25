@@ -18,31 +18,19 @@ class SupportPage extends StatelessWidget {
   Widget buildSupportItem(String label, IconData icon, Color color, String url) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-      child: GestureDetector(
-        onTap: () => openLink(url),
-        child: Container(
-          height: 100,
-          width: double.infinity,
-          decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(15),
-          ),
-          child: Center(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(icon, color: Colors.white),
-                const SizedBox(width: 10),
-                Text(
-                  label,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontFamily: 'Poppins',
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
+      child: Card(
+        color: color,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+        child: ListTile(
+          onTap: () => openLink(url),
+          leading: Icon(icon, color: Colors.white, size: 30),
+          title: Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white,
+              fontFamily: 'Poppins',
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
             ),
           ),
         ),
@@ -54,34 +42,56 @@ class SupportPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: const Bar(title: 'Support'),
-      body: ListView(
+      body: Column(
         children: [
-          buildSupportItem(
-            'Email',
-            Icons.email,
-            Colors.blue.shade400,
-            'mailto:lutfizadeh5@gmail.com',
+          Expanded(
+            child: ListView(
+              padding: EdgeInsets.only(top: 8, bottom: 8),
+              children: [
+                buildSupportItem(
+                  'Email',
+                  Icons.email,
+                  Colors.blue.shade400,
+                  'mailto:lutfizadeh5@gmail.com',
+                ),
+                buildSupportItem(
+                  'WhatsApp',
+                  Icons.chat,
+                  Colors.green,
+                  'https://wa.me/6285156817148',
+                ),
+                buildSupportItem(
+                  'Telepon',
+                  Icons.phone,
+                  Colors.orange,
+                  'tel:+62851568171488',
+                ),
+                buildSupportItem(
+                  'Telegram',
+                  Icons.send,
+                  Colors.blue.shade700,
+                  'https://t.me/Lutfizadeh',
+                ),
+              ],
+            ),
           ),
-          buildSupportItem(
-            'WhatsApp',
-            Icons.chat,
-            Colors.green,
-            'https://wa.me/6285156817148',
-          ),
-          buildSupportItem(
-            'Telepon',
-            Icons.phone,
-            Colors.orange,
-            'tel:+62851568171488',
-          ),
-          buildSupportItem(
-            'Telegram',
-            Icons.send,
-            Colors.blue.shade700,
-            'https://t.me/Lutfizadeh',
+
+          // Footer kecil di bawah list
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+            child: Text(
+              'Butuh bantuan lebih lanjut? Hubungi kami kapan saja!',
+              style: TextStyle(
+                color: Colors.grey[600],
+                fontSize: 14,
+                fontStyle: FontStyle.italic,
+              ),
+              textAlign: TextAlign.center,
+            ),
           ),
         ],
       ),
+
       bottomNavigationBar: const BottomBar(),
     );
   }

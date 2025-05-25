@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+
 import '../widgets/bar.dart';
 import 'package:transfer_bank/widgets/bottombar.dart';
 
@@ -11,25 +13,33 @@ class HistoryPage extends StatelessWidget {
       'title': 'Top Up via BNI',
       'subtitle': '01 Mei 2025 - 09:30',
       'amount': 250000,
-      'type': 'topup'
+      'type': 'topup',
+      'destination': 'BNI - 1234567890',
+      'note': 'Top up saldo'
     },
     {
       'title': 'Top Up via Mandiri',
       'subtitle': '02 Mei 2025 - 11:15',
       'amount': 500000,
-      'type': 'topup'
+      'type': 'topup',
+      'destination': 'Mandiri - 9876543210',
+      'note': 'Top up via Mandiri'
     },
     {
       'title': 'Transfer ke BCA',
       'subtitle': '03 Mei 2025 - 13:45',
       'amount': 100000,
-      'type': 'transfer'
+      'type': 'transfer',
+      'destination': 'BCA - 1234567890',
+      'note': 'Bayar pulsa'
     },
     {
-      'title': 'Transfer ke BRI',
+      'title': 'Transfer ke Dana',
       'subtitle': '05 Mei 2025 - 18:20',
       'amount': 200000,
-      'type': 'transfer'
+      'type': 'transfer',
+      'destination': 'Dana - 081234567890',
+      'note': 'Belanja online'
     },
   ];
 
@@ -37,6 +47,15 @@ class HistoryPage extends StatelessWidget {
     return transactions
         .where((tx) => tx['type'] == type)
         .fold(0, (sum, tx) => sum + tx['amount'] as int);
+  }
+
+  String formatCurrency(int amount) {
+    final currencyFormatter = NumberFormat.currency(
+      locale: 'id_ID',
+      symbol: 'Rp ',
+      decimalDigits: 0,
+    );
+    return currencyFormatter.format(amount);
   }
 
   Widget buildMonthlySummary() {
@@ -49,7 +68,7 @@ class HistoryPage extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.grey[100],
           borderRadius: BorderRadius.circular(12),
-          boxShadow: [
+          boxShadow: const [
             BoxShadow(
               color: Colors.black12,
               blurRadius: 4,
@@ -75,7 +94,7 @@ class HistoryPage extends StatelessWidget {
               children: [
                 const Text('Total Uang Masuk', style: TextStyle(fontFamily: 'Poppins')),
                 Text(
-                  'Rp${totalIn.toString()}',
+                  formatCurrency(totalIn),
                   style: const TextStyle(
                     color: Colors.green,
                     fontWeight: FontWeight.bold,
@@ -90,7 +109,7 @@ class HistoryPage extends StatelessWidget {
               children: [
                 const Text('Total Uang Keluar', style: TextStyle(fontFamily: 'Poppins')),
                 Text(
-                  'Rp${totalOut.toString()}',
+                  formatCurrency(totalOut),
                   style: const TextStyle(
                     color: Colors.red,
                     fontWeight: FontWeight.bold,
@@ -122,29 +141,50 @@ class HistoryPage extends StatelessWidget {
   Widget buildHistoryItem(Map<String, dynamic> tx) {
     bool isTopUp = tx['type'] == 'topup';
 
-    return ListTile(
-      tileColor: isTopUp ? Colors.green[50] : Colors.red[50],
-      leading: CircleAvatar(
-        backgroundColor: isTopUp ? Colors.green : Colors.red,
-        child: Icon(
-          isTopUp ? Icons.arrow_downward : Icons.arrow_upward,
-          color: Colors.white,
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: isTopUp ? Colors.green[50] : Colors.red[50],
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: isTopUp ? Colors.green : Colors.red,
+          child: Icon(
+            isTopUp ? Icons.arrow_downward : Icons.arrow_upward,
+            color: Colors.white,
+          ),
         ),
-      ),
-      title: Text(
-        tx['title'],
-        style: const TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w600),
-      ),
-      subtitle: Text(
-        tx['subtitle'],
-        style: const TextStyle(fontFamily: 'Poppins'),
-      ),
-      trailing: Text(
-        '${isTopUp ? '+' : '-'} Rp${tx['amount']}',
-        style: TextStyle(
-          fontFamily: 'Poppins',
-          color: isTopUp ? Colors.green : Colors.red,
-          fontWeight: FontWeight.bold,
+        title: Text(
+          tx['title'],
+          style: const TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w600),
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              tx['subtitle'],
+              style: const TextStyle(fontFamily: 'Poppins'),
+            ),
+            if (tx['destination'] != null)
+              Text(
+                'Tujuan: ${tx['destination']}',
+                style: const TextStyle(fontFamily: 'Poppins', fontSize: 12),
+              ),
+            if (tx['note'] != null)
+              Text(
+                'Keterangan: ${tx['note']}',
+                style: const TextStyle(fontFamily: 'Poppins', fontSize: 12),
+              ),
+          ],
+        ),
+        trailing: Text(
+          '${isTopUp ? '+' : '-'} ${formatCurrency(tx['amount'])}',
+          style: TextStyle(
+            fontFamily: 'Poppins',
+            color: isTopUp ? Colors.green : Colors.red,
+            fontWeight: FontWeight.bold,
+          ),
         ),
       ),
     );

@@ -5,51 +5,58 @@ import 'dart:convert';
 import '../widgets/bar.dart';
 import 'package:transfer_bank/widgets/bottombar.dart';
 
-class TopupPage extends StatefulWidget {
-  const TopupPage({super.key});
+class TransferPage extends StatefulWidget {
+  const TransferPage({super.key});
 
   @override
-  State<TopupPage> createState() => _TopupPageState();
+  State<TransferPage> createState() => _TransferPageState();
 }
 
-class _TopupPageState extends State<TopupPage> {
-  TextEditingController _nominalController = TextEditingController();
+class _TransferPageState extends State<TransferPage> {
+  final TextEditingController _nominalController = TextEditingController();
+  final TextEditingController _searchController = TextEditingController();
+
   List<dynamic> banks = [];
   List<dynamic> filteredBanks = [];
   int? selectedBankId;
-  String searchQuery = '';
 
   @override
   void initState() {
     super.initState();
     fetchBanks();
+    _searchController.addListener(_filterBanks);
   }
 
   Future<void> fetchBanks() async {
     final response = await http.get(Uri.parse('http://13.215.101.79/api/banks'));
     if (response.statusCode == 200) {
-      final Map<String, dynamic> responseData = jsonDecode(response.body);
-      final List<dynamic> data = responseData['data'];
+      final responseData = jsonDecode(response.body);
       setState(() {
-        banks = data;
-        filteredBanks = data;
+        banks = responseData['data'];
+        filteredBanks = banks;
       });
     } else {
       print('Gagal ambil data bank');
     }
   }
 
-  void filterBanks(String query) {
-    setState(() {
-      searchQuery = query;
-      filteredBanks = banks
-          .where((bank) =>
-              bank['bank_name'].toLowerCase().contains(query.toLowerCase()))
-          .toList();
-    });
+  void _filterBanks() {
+    final query = _searchController.text.toLowerCase();
+    if (query.isEmpty) {
+      setState(() {
+        filteredBanks = banks;
+      });
+    } else {
+      setState(() {
+        filteredBanks = banks.where((bank) {
+          final name = bank['bank_name'].toString().toLowerCase();
+          return name.contains(query);
+        }).toList();
+      });
+    }
   }
 
-  Future<void> submitTopup() async {
+  Future<void> submitTransfer() async {
     final amount = int.tryParse(_nominalController.text);
     if (selectedBankId == null || amount == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -62,7 +69,7 @@ class _TopupPageState extends State<TopupPage> {
       Uri.parse('http://13.215.101.79/api/transaksi'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
-        "type": "topup",
+        "type": "transfer",
         "bank_id": selectedBankId,
         "amount": amount,
       }),
@@ -70,16 +77,18 @@ class _TopupPageState extends State<TopupPage> {
 
     if (response.statusCode == 200 || response.statusCode == 201) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Top up berhasil')),
+        const SnackBar(content: Text('Transfer berhasil')),
       );
       _nominalController.clear();
+      _searchController.clear();
       setState(() {
         selectedBankId = null;
+        filteredBanks = banks;
       });
     } else {
-      print('Response gagal topup: ${response.body}');
+      print('Gagal transfer: ${response.body}');
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Gagal melakukan top up')),
+        const SnackBar(content: Text('Gagal melakukan transfer')),
       );
     }
   }
@@ -87,88 +96,97 @@ class _TopupPageState extends State<TopupPage> {
   @override
   void dispose() {
     _nominalController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: Bar(title: 'Topup'),
+      appBar: Bar(title: 'Transfer'),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Input Nominal
+            // Input Nominal dengan ikon uang
+           TextField(
+            controller: _nominalController,
+            keyboardType: TextInputType.number,
+            decoration: InputDecoration(
+              prefixText: 'Rp ',
+              labelText: 'Nominal',
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(15),
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
+            // Pencarian Bank dengan ikon bank
             TextField(
-              controller: _nominalController,
-              keyboardType: TextInputType.number,
+              controller: _searchController,
               decoration: InputDecoration(
-                prefixText: 'Rp ',
-                labelText: 'Nominal',
+                prefixIcon: const Icon(Icons.account_balance),
+                labelText: 'Cari Bank Tujuan',
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(15),
                 ),
               ),
             ),
+            const SizedBox(height: 10),
 
-            const SizedBox(height: 16),
-
-            // Search Bank
-            TextField(
-              onChanged: filterBanks,
-              decoration: InputDecoration(
-                prefixIcon: Icon(Icons.account_balance),
-                hintText: 'Cari bank...',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(15),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // List Bank (pilih salah satu)
+            // Daftar Bank dengan ikon wallet dan highlight pilihan
             Expanded(
-              child: filteredBanks.isEmpty
-                  ? const Center(child: Text('Bank tidak ditemukan'))
-                  : ListView.builder(
+              child: filteredBanks.isNotEmpty
+                  ? ListView.builder(
                       itemCount: filteredBanks.length,
                       itemBuilder: (context, index) {
                         final bank = filteredBanks[index];
                         final isSelected = selectedBankId == bank['id'];
+
                         return ListTile(
-                          leading: Icon(Icons.account_balance_wallet,
-                              color: isSelected ? Colors.blue : Colors.grey),
+                          leading: Icon(
+                            Icons.account_balance_wallet,
+                            color: isSelected ? Colors.blue : Colors.grey,
+                          ),
                           title: Text(
                             bank['bank_name'],
                             style: const TextStyle(fontFamily: 'Poppins'),
                           ),
+                          tileColor: isSelected ? Colors.blue[50] : null,
                           trailing: isSelected
                               ? const Icon(Icons.check_circle, color: Colors.blue)
                               : null,
-                          tileColor: isSelected ? Colors.blue[50] : null,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
                           onTap: () {
                             setState(() {
                               selectedBankId = bank['id'];
+                              _searchController.text = bank['bank_name'];
+                              FocusScope.of(context).unfocus();
                             });
                           },
                         );
                       },
+                    )
+                  : const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 8),
+                      child: Text('Bank tidak ditemukan'),
                     ),
             ),
-
             const SizedBox(height: 16),
-            // Tombol Topup
+
+            // Tombol Transfer dengan ikon kirim
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
-                onPressed: submitTopup,
-                icon: const Icon(Icons.add_circle_outline, size: 30, color: Colors.white),
+                onPressed: submitTransfer,
+                icon: const Icon(Icons.send, color: Colors.white),
                 label: const Text(
-                  'Topup',
+                  'Transfer',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
