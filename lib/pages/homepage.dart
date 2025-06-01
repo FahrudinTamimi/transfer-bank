@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import '../services/api_service.dart';
 import '../widgets/bar.dart';
-import 'package:transfer_bank/widgets/bottombar.dart';
-import 'package:transfer_bank/services/api_service.dart';
-import 'package:transfer_bank/pages/topuppage.dart'; 
-import 'package:transfer_bank/pages/transferpage.dart';
+import '../widgets/bottombar.dart';
+import 'login.dart';
+import 'topuppage.dart';
+import 'transferpage.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -13,23 +15,72 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  List<dynamic> bankList = [];
+  final FlutterSecureStorage storage = const FlutterSecureStorage();
+
+  List<dynamic> banks = [];
+  List<dynamic> filteredBanks = [];
+  String searchQuery = '';
+  int saldo = 0;
+  bool isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    fetchBanks();
+    loadData();
   }
 
-  void fetchBanks() async {
+  Future<void> loadData() async {
     try {
-      List<dynamic> banks = await ApiService.getBanks();
+      // Ambil token, kalau tidak ada langsung logout
+      final token = await storage.read(key: 'token');
+      if (token == null || token.isEmpty) {
+        _logoutAndRedirect();
+        return;
+      }
+
+      // Ambil daftar bank dari API
+      final banksData = await ApiService.getBanks();
+
+      // Ambil saldo user dari API
+      final currentSaldo = await ApiService.getSaldo();
+
       setState(() {
-        bankList = banks;
+        banks = banksData;
+        filteredBanks = banksData;
+        saldo = currentSaldo;
+        isLoading = false;
       });
     } catch (e) {
-      print('Gagal mengambil data: $e');
+      print('Error loading data: $e');
+      if (e.toString().contains('401')) {
+        // Token expired atau unauthorized, logout
+        _logoutAndRedirect();
+      } else {
+        setState(() {
+          isLoading = false;
+        });
+      }
     }
+  }
+
+  void filterBanks(String query) {
+    setState(() {
+      searchQuery = query;
+      filteredBanks = banks.where((bank) {
+        final name = bank['bank_name'].toString().toLowerCase();
+        return name.contains(query.toLowerCase());
+      }).toList();
+    });
+  }
+
+  void _logoutAndRedirect() async {
+    await storage.delete(key: 'token');
+    if (!mounted) return;
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (_) => const LoginPage()),
+      (route) => false,
+    );
   }
 
   void handleTopUp() {
@@ -46,10 +97,29 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  void handleLogout() {
+    _logoutAndRedirect();
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (isLoading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
     return Scaffold(
-      appBar: Bar(title: 'Home'),
+      appBar: Bar(
+        title: 'Home',
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout),
+            tooltip: 'Logout',
+            onPressed: handleLogout,
+          ),
+        ],
+      ),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -64,8 +134,8 @@ class _HomePageState extends State<HomePage> {
                 padding: const EdgeInsets.all(20),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
-                    Text(
+                  children: [
+                    const Text(
                       'Saldo User',
                       style: TextStyle(
                         fontSize: 22,
@@ -74,10 +144,10 @@ class _HomePageState extends State<HomePage> {
                         fontFamily: 'Poppins',
                       ),
                     ),
-                    SizedBox(height: 10),
+                    const SizedBox(height: 10),
                     Text(
-                      'Rp. 100.000',
-                      style: TextStyle(
+                      'Rp. $saldo',
+                      style: const TextStyle(
                         fontSize: 20,
                         color: Colors.white,
                         fontFamily: 'Poppins',
@@ -106,12 +176,14 @@ class _HomePageState extends State<HomePage> {
                           children: const [
                             Icon(Icons.add_circle_outline, size: 30, color: Colors.blue),
                             SizedBox(height: 8),
-                            Text('Topup',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  fontFamily: 'Poppins',
-                                )),
+                            Text(
+                              'Topup',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                fontFamily: 'Poppins',
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -133,12 +205,14 @@ class _HomePageState extends State<HomePage> {
                           children: const [
                             Icon(Icons.send_outlined, size: 30, color: Colors.blue),
                             SizedBox(height: 8),
-                            Text('Transfer',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  fontFamily: 'Poppins',
-                                )),
+                            Text(
+                              'Transfer',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                fontFamily: 'Poppins',
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -149,30 +223,36 @@ class _HomePageState extends State<HomePage> {
             ),
             const SizedBox(height: 20),
 
-            // Daftar Bank
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                'Daftar Bank',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  fontFamily: 'Poppins',
+            // Search Field
+            TextField(
+              onChanged: filterBanks,
+              decoration: InputDecoration(
+                hintText: 'Cari bank...',
+                prefixIcon: const Icon(Icons.search),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
                 ),
               ),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
 
+            // Daftar Bank
             Expanded(
-              child: bankList.isEmpty
-                  ? const Center(child: CircularProgressIndicator())
+              child: filteredBanks.isEmpty
+                  ? const Center(child: Text('Bank tidak ditemukan'))
                   : ListView.separated(
-                      itemCount: bankList.length,
+                      itemCount: filteredBanks.length,
                       separatorBuilder: (_, __) => const Divider(height: 1),
                       itemBuilder: (context, index) {
-                        final bank = bankList[index];
+                        final bank = filteredBanks[index];
                         return ListTile(
-                          leading: const Icon(Icons.account_balance_outlined, color: Colors.blue),
+                          leading: Icon(
+                            bank['type'] == "bank"
+                                ? Icons.account_balance_outlined
+                                : Icons.account_balance_wallet,
+                            color: Colors.blue,
+                          ),
                           title: Text(
                             bank['bank_name'],
                             style: const TextStyle(fontFamily: 'Poppins'),
