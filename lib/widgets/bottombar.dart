@@ -4,6 +4,7 @@ import 'package:transfer_bank/pages/homepage.dart';
 import 'package:transfer_bank/pages/supportpage.dart';
 import 'package:transfer_bank/pages/profilepage.dart';
 import 'package:transfer_bank/pages/topuppage.dart';
+import 'package:transfer_bank/pages/tutorialpage.dart';
 
 class BottomBar extends StatelessWidget {
   const BottomBar({
@@ -43,6 +44,9 @@ class BottomBar extends StatelessWidget {
             }),
             IconButton(icon: Icon(Icons.person), onPressed: () {
               Navigator.push(context, MaterialPageRoute(builder: (context) => ProfilePage()));
+            }),
+            IconButton(icon: Icon(Icons.info), onPressed: () {
+              Navigator.push(context, MaterialPageRoute(builder: (context) => Tutorialpage()));
             }),
           ],
         ),

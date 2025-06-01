@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 
 class Bar extends StatelessWidget implements PreferredSizeWidget {
   final String title;
+  final List<Widget>? actions;  // tambahkan parameter actions opsional
 
   const Bar({
     super.key,
-    required this.title
+    required this.title,
+    this.actions,
   });
 
   @override
@@ -17,7 +19,7 @@ class Bar extends StatelessWidget implements PreferredSizeWidget {
       automaticallyImplyLeading: false,
       title: Text(
         title,
-        style: TextStyle(
+        style: const TextStyle(
           color: Colors.white,
           fontFamily: 'Poppins',
           fontSize: 24,
@@ -26,6 +28,7 @@ class Bar extends StatelessWidget implements PreferredSizeWidget {
       ),
       backgroundColor: Colors.blue[300],
       centerTitle: true,
+      actions: actions,  // teruskan actions di sini
     );
   }
 }
