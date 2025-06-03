@@ -60,32 +60,34 @@ class ApiService {
 
   // Ambil daftar bank
   static Future<List<dynamic>> getBanks() async {
-    final token = await getToken();
-    final url = Uri.parse('$baseUrl/api/banks?per_page=188');
-    final response = await http.get(
-      url,
-      headers: {
-        'Content-Type': 'application/json',
-        if (token != null) 'Authorization': 'Bearer $token',
-      },
-    );
+  final token = await getToken();
+  final url = Uri.parse('$baseUrl/banks?per_page=188');
+  final response = await http.get(
+    url,
+    headers: {
+      'Content-Type': 'application/json',
+      if (token != null) 'Authorization': 'Bearer $token',
+    },
+  );
 
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      if (data['success'] == true && data['data'] != null) {
-        return List<dynamic>.from(data['data']);
-      } else {
-        throw Exception('Response API tidak valid: ${response.body}');
-      }
+  if (response.statusCode == 200) {
+    final data = jsonDecode(response.body);
+
+    if (data['data'] != null && data['data'] is List) {
+      return List<dynamic>.from(data['data']);
     } else {
-      throw Exception('Gagal mengambil data bank: ${response.statusCode}');
+      throw Exception('Response API tidak valid: ${response.body}');
     }
+  } else {
+    throw Exception('Gagal mengambil data bank: ${response.statusCode}');
   }
+}
+
 
   // Ambil saldo user
   static Future<int> getSaldo() async {
     final token = await getToken();
-    final url = Uri.parse('$baseUrl/api/users/saldo');
+    final url = Uri.parse('$baseUrl/users/saldo'); // Perbaikan: hapus satu 'api'
     final response = await http.get(
       url,
       headers: {
@@ -105,7 +107,7 @@ class ApiService {
   // Buat transaksi (topup/transfer)
   static Future<bool> createTransaction(Map<String, dynamic> transactionData) async {
     final token = await getToken();
-    final url = Uri.parse('$baseUrl/api/transactions');
+    final url = Uri.parse('$baseUrl/transactions'); // Perbaikan: hapus satu 'api'
     final response = await http.post(
       url,
       headers: {

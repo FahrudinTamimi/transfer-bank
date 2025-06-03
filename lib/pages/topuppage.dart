@@ -1,321 +1,404 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-
-import '../services/api_service.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../widgets/bar.dart';
-import 'package:transfer_bank/widgets/bottombar.dart';
+import '../widgets/bottombar.dart';
+import '../services/auth_service.dart';
 
-class TopupPage extends StatefulWidget {
-  const TopupPage({super.key});
+class Bank {
+  final int id;
+  final String bankCode;
+  final String bankName;
 
-  @override
-  State<TopupPage> createState() => _TopupPageState();
+  Bank({required this.id, required this.bankCode, required this.bankName});
+
+  factory Bank.fromJson(Map<String, dynamic> json) {
+    return Bank(
+      id: json['id'],
+      bankCode: json['bank_code'],
+      bankName: json['bank_name'],
+    );
+  }
 }
 
-class _TopupPageState extends State<TopupPage> {
-  final TextEditingController _nominalController = TextEditingController();
-  final TextEditingController _accountNumberController = TextEditingController();
-  final TextEditingController _accountNameController = TextEditingController();
+class TopUpPage extends StatefulWidget {
+  const TopUpPage({super.key});
 
-  List<dynamic> banks = [];
-  List<dynamic> filteredBanks = [];
-  int? selectedBankId;
-  String searchQuery = '';
-  bool searchingAccount = false;
+  @override
+  State<TopUpPage> createState() => _TopUpPageState();
+}
+
+class _TopUpPageState extends State<TopUpPage> {
+  List<Bank> banks = [];
+  List<Bank> filteredBanks = [];
+  Bank? selectedBank;
+
+  final TextEditingController _bankSearchController = TextEditingController();
+  final TextEditingController _accountController = TextEditingController();
+  final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _nominalController = TextEditingController();
+  final TextEditingController _descriptionController = TextEditingController();
+
+  bool isLoading = false;
+  bool isCheckingAccount = false;
+  String? validationMessage;
+
+  final String apiKey = dotenv.env['API_KEY'] ?? '';
 
   @override
   void initState() {
     super.initState();
     fetchBanks();
-  }
-
-  // Ambil data bank dari API
-  Future<void> fetchBanks() async {
-    final response = await http.get(Uri.parse('http://13.215.101.79/api/banks?per_page=188'));
-    if (response.statusCode == 200) {
-      final Map<String, dynamic> responseData = jsonDecode(response.body);
-      final List<dynamic> data = responseData['data'];
-      setState(() {
-        banks = data;
-        filteredBanks = data;
-      });
-    } else {
-      print('Gagal ambil data bank');
-    }
-  }
-
-  // Filter bank berdasar pencarian
-  void filterBanks(String query) {
-    setState(() {
-      searchQuery = query;
-      filteredBanks = banks.where((bank) {
-        final bankName = bank['bank_name']?.toString().toLowerCase() ?? '';
-        return bankName.contains(query.toLowerCase());
-      }).toList();
-    });
-  }
-
-  // Cari nama rekening berdasarkan nomor rekening dengan POST ke API
-  Future<Map<String, dynamic>?> searchAccountNumber(String accountNumber) async {
-    setState(() {
-      searchingAccount = true;
-    });
-
-    final token = await ApiService.getToken();
-    final url = Uri.parse('http://13.215.101.79/api/accounts/search');
-    final response = await http.post(
-      url,
-      headers: {
-        'Content-Type': 'application/json',
-        if (token != null) 'Authorization': 'Bearer $token',
-      },
-      body: jsonEncode({
-        "account_number": accountNumber,
-      }),
-    );
-
-    setState(() {
-      searchingAccount = false;
-    });
-
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      if (data['success'] == true && data['data'] != null) {
-        return data['data'];
-      }
-    }
-    return null;
-  }
-
-  // Saat input nomor rekening dikirim (enter/done)
-  Future<void> onAccountNumberSubmitted(String value) async {
-    if (value.trim().isEmpty) return;
-
-    final result = await searchAccountNumber(value.trim());
-    if (result != null) {
-      setState(() {
-        _accountNameController.text = result['account_name'] ?? '';
-
-        // Sesuaikan bank berdasar nama bank dari hasil pencarian
-        final bankFound = banks.firstWhere(
-          (bank) =>
-              bank['bank_name']?.toString().toLowerCase() ==
-              (result['bank'] ?? '').toLowerCase(),
-          orElse: () => null,
-        );
-
-        if (bankFound != null) {
-          selectedBankId = bankFound['id'];
-        } else {
-          selectedBankId = null;
-        }
-      });
-    } else {
-      setState(() {
-        _accountNameController.clear();
-        selectedBankId = null;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Nomor rekening tidak ditemukan')),
-      );
-    }
-  }
-
-  // Submit data top up ke backend
-  Future<void> submitTopup() async {
-    final amount = int.tryParse(_nominalController.text);
-    final accountNumber = _accountNumberController.text.trim();
-    final accountName = _accountNameController.text.trim();
-
-    if (selectedBankId == null ||
-        amount == null ||
-        accountNumber.isEmpty ||
-        accountName.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Isi semua data dengan benar')),
-      );
-      return;
-    }
-
-    final response = await http.post(
-      Uri.parse('http://13.215.101.79/api/transactions'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        "type": "topup",
-        "bank_id": selectedBankId,
-        "account_number": accountNumber,
-        "account_name": accountName,
-        "amount": amount,
-        "description": "Topup via aplikasi",
-      }),
-    );
-
-    if (response.statusCode == 200 || response.statusCode == 201) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Top up berhasil')),
-      );
-      _nominalController.clear();
-      _accountNumberController.clear();
-      _accountNameController.clear();
-      setState(() {
-        selectedBankId = null;
-      });
-    } else {
-      print('Response gagal topup: ${response.body}');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Gagal melakukan top up')),
-      );
-    }
+    _bankSearchController.addListener(_filterBanks);
+    _accountController.addListener(_onAccountChanged);
   }
 
   @override
   void dispose() {
+    _bankSearchController.dispose();
+    _accountController.dispose();
+    _nameController.dispose();
     _nominalController.dispose();
-    _accountNumberController.dispose();
-    _accountNameController.dispose();
+    _descriptionController.dispose();
     super.dispose();
+  }
+
+  Future<void> fetchBanks() async {
+    final url = Uri.parse('http://13.215.101.79/api/banks?per_page=188');
+    try {
+      final response = await http.get(url);
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final List<dynamic> list = data['data'];
+        setState(() {
+          banks = list.map((e) => Bank.fromJson(e)).toList();
+          filteredBanks = banks;
+        });
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gagal mengambil data bank: ${response.statusCode}')),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Terjadi kesalahan saat mengambil bank: $e')),
+      );
+    }
+  }
+
+  void _filterBanks() {
+    final query = _bankSearchController.text.toLowerCase();
+    setState(() {
+      filteredBanks = banks
+          .where((bank) =>
+              bank.bankName.toLowerCase().contains(query) ||
+              bank.bankCode.toLowerCase().contains(query))
+          .toList();
+    });
+  }
+
+  void _onAccountChanged() {
+    if (selectedBank != null && _accountController.text.length >= 6) {
+      cekRekening(selectedBank!.bankCode, _accountController.text.trim());
+    } else {
+      setState(() {
+        _nameController.text = '';
+        validationMessage = null;
+      });
+    }
+  }
+
+  Future<void> cekRekening(String bankCode, String accountNumber) async {
+    setState(() {
+      isCheckingAccount = true;
+      validationMessage = null;
+    });
+
+    final url = Uri.parse('https://atlantich2h.com/transfer/cek_rekening');
+
+    try {
+      final response = await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Accept': 'application/json',
+        },
+        body: {
+          'api_key': apiKey,
+          'bank_code': bankCode,
+          'account_number': accountNumber,
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final status = data['status'];
+        final ownerName = data['data']?['nama_pemilik'];
+
+        if (status == true && ownerName != null && ownerName.isNotEmpty) {
+          setState(() {
+            _nameController.text = ownerName;
+            validationMessage = 'Berhasil mendapatkan nama rekening';
+          });
+        } else {
+          setState(() {
+            _nameController.text = '';
+            validationMessage = 'Nama rekening tidak ditemukan';
+          });
+        }
+      } else {
+        final data = jsonDecode(response.body);
+        setState(() {
+          _nameController.text = '';
+          validationMessage = 'Gagal memeriksa nama rekening: ${data['message'] ?? 'Error tidak diketahui'}';
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _nameController.text = '';
+        validationMessage = 'Terjadi kesalahan jaringan saat cek rekening';
+      });
+    } finally {
+      setState(() {
+        isCheckingAccount = false;
+      });
+    }
+  }
+
+  Future<void> submitTopUp() async {
+    if (selectedBank == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Pilih bank terlebih dahulu')),
+      );
+      return;
+    }
+
+    final accountNumber = _accountController.text.trim();
+    final accountName = _nameController.text.trim();
+    final amount = int.tryParse(_nominalController.text.trim());
+    final description = _descriptionController.text.trim();
+
+    if (accountNumber.isEmpty || accountName.isEmpty || amount == null || amount <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Lengkapi semua data dengan benar')),
+      );
+      return;
+    }
+
+    setState(() => isLoading = true);
+
+    final token = await AuthService.getToken();
+    if (token == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Token tidak ditemukan. Harap login ulang.')),
+      );
+      setState(() => isLoading = false);
+      return;
+    }
+
+    final refId = DateTime.now().millisecondsSinceEpoch.toString();
+    final now = DateTime.now();
+    final formattedDate =
+        "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')} "
+        "${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}";
+
+    final bodyData = {
+      "ref_id": refId,
+      "type": "topup",
+      "bank_id": selectedBank!.id,
+      "account_number": accountNumber,
+      "account_name": accountName,
+      "amount": amount,
+      "description": description,
+      "date": formattedDate,
+      "status": "Pending",
+    };
+
+    try {
+      final response = await http.post(
+        Uri.parse('http://13.215.101.79/api/transactions'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode(bodyData),
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Top Up berhasil')),
+        );
+        _bankSearchController.clear();
+        _accountController.clear();
+        _nameController.clear();
+        _nominalController.clear();
+        _descriptionController.clear();
+        setState(() {
+          selectedBank = null;
+          filteredBanks = banks;
+          validationMessage = null;
+        });
+      } else {
+        final data = jsonDecode(response.body);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gagal top up: ${data['message'] ?? 'Terjadi kesalahan'}')),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Terjadi kesalahan jaringan')),
+      );
+    }
+
+    setState(() => isLoading = false);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: Bar(title: 'Topup'),
+      appBar: Bar(title: 'Top Up'),
       body: Padding(
         padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            TextField(
-              controller: _accountNumberController,
-              keyboardType: TextInputType.number,
-              decoration: InputDecoration(
-                labelText: 'Nomor Rekening / Wallet',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(15),
-                ),
-                suffixIcon: searchingAccount
-                    ? Padding(
-                        padding: const EdgeInsets.all(12.0),
-                        child: SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        ),
-                      )
-                    : null,
-              ),
-              onSubmitted: onAccountNumberSubmitted,
-            ),
-
-            const SizedBox(height: 12),
-
-            TextField(
-              controller: _accountNameController,
-              readOnly: true,
-              decoration: InputDecoration(
-                labelText: 'Nama Pemilik Rekening / Wallet',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(15),
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 16),
-
-            TextField(
-              controller: _nominalController,
-              keyboardType: TextInputType.number,
-              decoration: InputDecoration(
-                prefixText: 'Rp ',
-                labelText: 'Nominal',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(15),
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 16),
-
-            TextField(
-              onChanged: filterBanks,
-              decoration: InputDecoration(
-                prefixIcon: const Icon(Icons.account_balance),
-                hintText: 'Cari bank / wallet...',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(15),
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 12),
-
-            Expanded(
-              child: filteredBanks.isEmpty
-                  ? const Center(child: Text('Bank atau Wallet tidak ditemukan'))
-                  : ListView.builder(
-                      itemCount: filteredBanks.length,
-                      itemBuilder: (context, index) {
-                        final bank = filteredBanks[index];
-                        final isSelected = selectedBankId == bank['id'];
-                        return ListTile(
-                          leading: Icon(
-                            bank['type'] == 'bank'
-                                ? Icons.account_balance_outlined
-                                : Icons.account_balance_wallet,
-                            color: isSelected ? Colors.blue : Colors.grey,
-                          ),
-                          title: Text(
-                            bank['bank_name'] ?? '',
-                            style: const TextStyle(fontFamily: 'Poppins'),
-                          ),
-                          trailing: isSelected
-                              ? const Icon(Icons.check_circle, color: Colors.blue)
-                              : null,
-                          tileColor: isSelected ? Colors.blue[50] : null,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          onTap: () {
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Pilih Bank:', style: TextStyle(fontWeight: FontWeight.bold)),
+              TextField(
+                controller: _bankSearchController,
+                decoration: InputDecoration(
+                  hintText: 'Cari bank...',
+                  suffixIcon: selectedBank != null
+                      ? IconButton(
+                          icon: const Icon(Icons.clear),
+                          onPressed: () {
                             setState(() {
-                              selectedBankId = bank['id'];
+                              selectedBank = null;
+                              _bankSearchController.clear();
+                              filteredBanks = banks;
+                              _nameController.clear();
+                              validationMessage = null;
                             });
                           },
-                        );
-                      },
-                    ),
-            ),
-
-            const SizedBox(height: 16),
-
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: submitTopup,
-                icon: const Icon(Icons.add_circle_outline,
-                    size: 30, color: Colors.white),
-                label: const Text(
-                  'Topup',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    fontFamily: 'Poppins',
-                    color: Colors.white,
+                        )
+                      : null,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(15)),
+                ),
+              ),
+              if (filteredBanks.isNotEmpty && selectedBank == null)
+                Container(
+                  constraints: const BoxConstraints(maxHeight: 200),
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: filteredBanks.length,
+                    itemBuilder: (context, index) {
+                      final bank = filteredBanks[index];
+                      return ListTile(
+                        title: Text(bank.bankName),
+                        subtitle: Text(bank.bankCode),
+                        onTap: () {
+                          setState(() {
+                            selectedBank = bank;
+                            _bankSearchController.text = bank.bankName;
+                            filteredBanks = [];
+                            _nameController.clear();
+                            validationMessage = null;
+                          });
+                        },
+                      );
+                    },
                   ),
                 ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue[300],
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(15),
+              const SizedBox(height: 10),
+              TextField(
+                controller: _accountController,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  labelText: 'Nomor Rekening',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(15)),
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: _nameController,
+                readOnly: true,
+                decoration: InputDecoration(
+                  labelText: 'Nama Pemilik Rekening',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(15)),
+                  suffixIcon: isCheckingAccount
+                      ? const Padding(
+                          padding: EdgeInsets.all(12.0),
+                          child: SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        )
+                      : null,
+                ),
+              ),
+              if (validationMessage != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(
+                    validationMessage!,
+                    style: TextStyle(
+                      color: validationMessage == 'Berhasil mendapatkan nama rekening'
+                          ? Colors.green
+                          : Colors.red,
+                    ),
+                  ),
+                ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: _nominalController,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  prefixText: 'Rp ',
+                  labelText: 'Nominal Top Up',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(15)),
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: _descriptionController,
+                decoration: InputDecoration(
+                  labelText: 'Deskripsi (opsional)',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(15)),
+                ),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: isLoading ? null : submitTopUp,
+                  icon: isLoading
+                      ? const SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2,
+                          ),
+                        )
+                      : const Icon(Icons.add_circle_outline, color: Colors.white),
+                  label: Text(
+                    isLoading ? 'Memproses...' : 'Top Up Sekarang',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
-      bottomNavigationBar: BottomBar(),
+      bottomNavigationBar: const BottomBar(),
     );
   }
 }

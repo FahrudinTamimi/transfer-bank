@@ -44,7 +44,6 @@ class _TransferPageState extends State<TransferPage> {
   bool isCheckingAccount = false;
   String? validationMessage;
 
-  // Ambil API key dari .env
   final String apiKey = dotenv.env['API_KEY'] ?? '';
 
   @override
@@ -132,8 +131,8 @@ class _TransferPageState extends State<TransferPage> {
         },
       );
 
-      print('Response status: ${response.statusCode}');
-      print('Response body: ${response.body}');
+      print('CekRekening Response status: ${response.statusCode}');
+      print('CekRekening Response body: ${response.body}');
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -159,7 +158,7 @@ class _TransferPageState extends State<TransferPage> {
         });
       }
     } catch (e) {
-      print('Error: $e');
+      print('CekRekening Error: $e');
       setState(() {
         _nameController.text = '';
         validationMessage = 'Terjadi kesalahan jaringan saat cek rekening';
@@ -184,6 +183,8 @@ class _TransferPageState extends State<TransferPage> {
     final amount = int.tryParse(_amountController.text.trim());
     final description = _descriptionController.text.trim();
 
+    print('SubmitTransfer Debug: account=$accountNumber, name=$accountName, amount=$amount');
+
     if (accountNumber.isEmpty || accountName.isEmpty || amount == null || amount <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Lengkapi semua data dengan benar')),
@@ -203,7 +204,24 @@ class _TransferPageState extends State<TransferPage> {
     }
 
     final refId = DateTime.now().millisecondsSinceEpoch.toString();
-    final today = DateTime.now().toIso8601String().split('T').first;
+   final now = DateTime.now();
+    final formattedDate =
+    "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')} "
+    "${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}";
+
+    final bodyData = {
+      "ref_id": refId,
+      "type": "transfer",
+      "bank_id": selectedBank!.id,
+      "account_number": accountNumber,
+      "account_name": accountName,
+      "amount": amount,
+      "description": description,
+      "date": formattedDate,
+      "status": "Pending",
+    };
+
+    print('SubmitTransfer Body: $bodyData');
 
     try {
       final response = await http.post(
@@ -213,18 +231,11 @@ class _TransferPageState extends State<TransferPage> {
           'Accept': 'application/json',
           'Authorization': 'Bearer $token',
         },
-        body: jsonEncode({
-          "ref_id": refId,
-          "type": "transfer",
-          "bank_id": selectedBank!.id,
-          "account_number": accountNumber,
-          "account_name": accountName,
-          "amount": amount,
-          "description": description,
-          "date": today,
-          "status": "pending",
-        }),
+        body: jsonEncode(bodyData),
       );
+
+      print('SubmitTransfer Response status: ${response.statusCode}');
+      print('SubmitTransfer Response body: ${response.body}');
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -247,6 +258,7 @@ class _TransferPageState extends State<TransferPage> {
         );
       }
     } catch (e) {
+      print('SubmitTransfer Error: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Terjadi kesalahan jaringan')),
       );

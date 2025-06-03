@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:transfer_bank/services/auth_service.dart';
 import 'package:transfer_bank/pages/homepage.dart';
+import 'package:transfer_bank/pages/register.dart';  // jangan lupa buat file ini
 
 class LoginPage extends StatefulWidget {
   const LoginPage({Key? key}) : super(key: key);
@@ -22,7 +23,6 @@ class _LoginPageState extends State<LoginPage> {
       errorMessage = '';
     });
 
-    // Log: mulai login
     print('Login mulai...');
     print('Email: ${emailController.text.trim()}');
     print('Password: ${passwordController.text.trim()}');
@@ -37,14 +37,12 @@ class _LoginPageState extends State<LoginPage> {
     });
 
     if (success) {
-      // Log: login berhasil
       print('Login berhasil, pindah ke HomePage...');
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const HomePage()),
       );
     } else {
-      // Log: login gagal
       print('Login gagal! Token tidak ditemukan / error.');
       setState(() {
         errorMessage = 'Login gagal! Cek email/password.';
@@ -77,6 +75,15 @@ class _LoginPageState extends State<LoginPage> {
                     onPressed: loginUser,
                     child: const Text('Login'),
                   ),
+            TextButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const RegisterPage()),
+                );
+              },
+              child: const Text('Belum punya akun? Daftar di sini'),
+            ),
             if (errorMessage.isNotEmpty) ...[
               const SizedBox(height: 8),
               Text(

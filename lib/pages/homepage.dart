@@ -31,17 +31,13 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> loadData() async {
     try {
-      // Ambil token, kalau tidak ada langsung logout
       final token = await storage.read(key: 'token');
       if (token == null || token.isEmpty) {
         _logoutAndRedirect();
         return;
       }
 
-      // Ambil daftar bank dari API
       final banksData = await ApiService.getBanks();
-
-      // Ambil saldo user dari API
       final currentSaldo = await ApiService.getSaldo();
 
       setState(() {
@@ -53,7 +49,6 @@ class _HomePageState extends State<HomePage> {
     } catch (e) {
       print('Error loading data: $e');
       if (e.toString().contains('401')) {
-        // Token expired atau unauthorized, logout
         _logoutAndRedirect();
       } else {
         setState(() {
@@ -86,7 +81,7 @@ class _HomePageState extends State<HomePage> {
   void handleTopUp() {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => const TopupPage()),
+      MaterialPageRoute(builder: (context) => const TopUpPage()),
     );
   }
 
@@ -268,7 +263,7 @@ class _HomePageState extends State<HomePage> {
           ],
         ),
       ),
-      bottomNavigationBar: BottomBar(),
+      bottomNavigationBar: const BottomBar(), 
     );
   }
 }
