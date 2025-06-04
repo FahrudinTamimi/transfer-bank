@@ -16,6 +16,7 @@ class HistoryPage extends StatefulWidget {
 
 class _HistoryPageState extends State<HistoryPage> {
   List<dynamic> transactions = [];
+  Map<String, String> bankNames = {}; // Map untuk menyimpan bank_id -> bank_name
   bool isLoading = true;
   String errorMessage = '';
   String? token;
@@ -59,6 +60,8 @@ class _HistoryPageState extends State<HistoryPage> {
         token = fetchedToken;
       });
 
+      // Fetch banks first, then transactions
+      await fetchBanks();
       await fetchTransactions();
     } catch (e, stackTrace) {
       print('Error saat loadToken(): $e');
@@ -69,6 +72,59 @@ class _HistoryPageState extends State<HistoryPage> {
           errorMessage = 'Gagal memuat token: $e';
         });
       }
+    }
+  }
+
+  Future<void> fetchBanks() async {
+    if (token == null || token!.isEmpty) {
+      return;
+    }
+
+    final url = Uri.parse('http://13.215.101.79/api/banks?per_page=187');
+    print('Memulai fetchBanks() ke $url dengan token: $token');
+
+    try {
+      final response = await http.get(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      print('Banks API Status code: ${response.statusCode}');
+      print('Banks API Response body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final banks = data['data'] ?? [];
+        
+        // Create map of bank_id -> bank_name
+        Map<String, String> tempBankNames = {};
+        for (var bank in banks) {
+          tempBankNames[bank['id'].toString()] = bank['bank_name'] ?? 'Unknown Bank';
+        }
+        
+        setState(() {
+          bankNames = tempBankNames;
+        });
+        
+        print('Berhasil memuat ${banks.length} bank');
+      } else if (response.statusCode == 401) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Sesi habis, silakan login ulang.')),
+          );
+          Navigator.pushReplacementNamed(context, '/login');
+        }
+      } else {
+        print('Error fetching banks: ${response.statusCode}');
+        print('Error Body: ${response.body}');
+      }
+    } catch (e, stackTrace) {
+      print('Error saat fetchBanks(): $e');
+      print(stackTrace);
     }
   }
 
@@ -141,6 +197,12 @@ class _HistoryPageState extends State<HistoryPage> {
       decimalDigits: 0,
     );
     return currencyFormatter.format(amount);
+  }
+
+  String getBankName(dynamic bankId) {
+    if (bankId == null) return 'Unknown Bank';
+    String bankIdStr = bankId.toString();
+    return bankNames[bankIdStr] ?? 'Bank ID: $bankIdStr';
   }
 
   Widget buildMonthlySummary() {
@@ -228,10 +290,15 @@ class _HistoryPageState extends State<HistoryPage> {
 
     String dateFormatted = '';
     try {
+      // Parse ISO 8601 format: "2025-05-25T20:16:19.000000Z"
       final dateTime = DateTime.parse(tx['created_at']);
-      dateFormatted = DateFormat('dd MMM yyyy - HH:mm').format(dateTime);
-    } catch (_) {
-      dateFormatted = tx['created_at'] ?? '';
+      // Convert to local timezone
+      final localDateTime = dateTime.toLocal();
+      dateFormatted = DateFormat('dd MMM yyyy - HH:mm', 'id_ID').format(localDateTime);
+    } catch (e) {
+      print('Error parsing date: $e');
+      print('Original created_at: ${tx['created_at']}');
+      dateFormatted = tx['created_at']?.toString() ?? 'Invalid Date';
     }
 
     return Container(
@@ -259,25 +326,52 @@ class _HistoryPageState extends State<HistoryPage> {
               dateFormatted,
               style: const TextStyle(fontFamily: 'Poppins'),
             ),
-            if (tx['destination'] != null)
+            if (tx['account_number'] != null)
               Text(
-                'Tujuan: ${tx['destination']}',
+                'Rekening: ${tx['account_number']}',
                 style: const TextStyle(fontFamily: 'Poppins', fontSize: 12),
               ),
-            if (tx['note'] != null)
+            if (tx['account_name'] != null)
               Text(
-                'Keterangan: ${tx['note']}',
+                'Nama: ${tx['account_name']}',
+                style: const TextStyle(fontFamily: 'Poppins', fontSize: 12),
+              ),
+            if (tx['description'] != null)
+              Text(
+                'Keterangan: ${tx['description']}',
+                style: const TextStyle(fontFamily: 'Poppins', fontSize: 12),
+              ),
+            if (tx['status'] != null)
+              Text(
+                'Status: ${tx['status']}',
                 style: const TextStyle(fontFamily: 'Poppins', fontSize: 12),
               ),
           ],
         ),
-        trailing: Text(
-          '${isTopUp ? '+' : '-'} ${formatCurrency(tx['amount'] ?? 0)}',
-          style: TextStyle(
-            fontFamily: 'Poppins',
-            color: isTopUp ? Colors.green : Colors.red,
-            fontWeight: FontWeight.bold,
-          ),
+        trailing: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Text(
+              '${isTopUp ? '+' : '-'} ${formatCurrency(tx['amount'] ?? 0)}',
+              style: TextStyle(
+                fontFamily: 'Poppins',
+                color: isTopUp ? Colors.green : Colors.red,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              getBankName(tx['bank_id']),
+              style: TextStyle(
+                fontFamily: 'Poppins',
+                color: isTopUp ? Colors.green : Colors.red,
+                fontWeight: FontWeight.w500,
+                fontSize: 12,
+              ),
+              textAlign: TextAlign.end,
+            ),
+          ],
         ),
       ),
     );
@@ -285,10 +379,23 @@ class _HistoryPageState extends State<HistoryPage> {
 
   @override
   Widget build(BuildContext context) {
+    // Sort transactions by created_at (newest first)
+    final sortedTransactions = List.from(transactions);
+    sortedTransactions.sort((a, b) {
+      try {
+        final dateA = DateTime.parse(a['created_at']);
+        final dateB = DateTime.parse(b['created_at']);
+        return dateB.compareTo(dateA); // Descending order (newest first)
+      } catch (e) {
+        print('Error sorting dates: $e');
+        return 0;
+      }
+    });
+
     final topUpTransactions =
-        transactions.where((tx) => tx['type'] == 'topup').toList();
+        sortedTransactions.where((tx) => tx['type'] == 'topup').toList();
     final transferTransactions =
-        transactions.where((tx) => tx['type'] == 'transfer').toList();
+        sortedTransactions.where((tx) => tx['type'] == 'transfer').toList();
 
     return Scaffold(
       appBar: const Bar(title: 'History'),

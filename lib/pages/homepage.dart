@@ -1,27 +1,27 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import '../services/api_service.dart';
+import 'package:http/http.dart' as http;
+import 'package:intl/intl.dart';
 import '../widgets/bar.dart';
 import '../widgets/bottombar.dart';
-import 'login.dart';
-import 'topuppage.dart';
-import 'transferpage.dart';
+import '../services/auth_service.dart';
 
 class HomePage extends StatefulWidget {
-  const HomePage({super.key});
+  final String token;
+  const HomePage({Key? key, this.token = ''}) : super(key: key);
 
   @override
   State<HomePage> createState() => _HomePageState();
 }
 
 class _HomePageState extends State<HomePage> {
-  final FlutterSecureStorage storage = const FlutterSecureStorage();
-
-  List<dynamic> banks = [];
-  List<dynamic> filteredBanks = [];
-  String searchQuery = '';
-  int saldo = 0;
+  int totalTopup = 0;
+  int totalTransfer = 0;
+  int currentBalance = 0;
+  String? userName;
+  String? token;
   bool isLoading = true;
+  String errorMessage = '';
 
   @override
   void initState() {
@@ -31,239 +31,189 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> loadData() async {
     try {
-      final token = await storage.read(key: 'token');
-      if (token == null || token.isEmpty) {
-        _logoutAndRedirect();
+      final fetchedToken =
+          widget.token.isNotEmpty ? widget.token : await AuthService.getToken();
+
+      if (fetchedToken == null || fetchedToken.isEmpty) {
+        setState(() {
+          isLoading = false;
+          errorMessage = 'Token tidak ditemukan.';
+        });
         return;
       }
 
-      final banksData = await ApiService.getBanks();
-      final currentSaldo = await ApiService.getSaldo();
-
       setState(() {
-        banks = banksData;
-        filteredBanks = banksData;
-        saldo = currentSaldo;
+        token = fetchedToken;
+      });
+
+      await Future.wait([fetchProfile(), fetchTransactionsSummary()]);
+    } catch (e) {
+      setState(() {
+        errorMessage = 'Terjadi kesalahan: $e';
         isLoading = false;
       });
-    } catch (e) {
-      print('Error loading data: $e');
-      if (e.toString().contains('401')) {
-        _logoutAndRedirect();
-      } else {
-        setState(() {
-          isLoading = false;
-        });
-      }
     }
   }
 
-  void filterBanks(String query) {
-    setState(() {
-      searchQuery = query;
-      filteredBanks = banks.where((bank) {
-        final name = bank['bank_name'].toString().toLowerCase();
-        return name.contains(query.toLowerCase());
-      }).toList();
-    });
-  }
-
-  void _logoutAndRedirect() async {
-    await storage.delete(key: 'token');
-    if (!mounted) return;
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (_) => const LoginPage()),
-      (route) => false,
+  Future<void> fetchProfile() async {
+    final url = Uri.parse('http://13.215.101.79/api/profile');
+    final response = await http.get(
+      url,
+      headers: {'Accept': 'application/json', 'Authorization': 'Bearer $token'},
     );
+
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      setState(() {
+        userName = data['data']['name'];
+      });
+    }
   }
 
-  void handleTopUp() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const TopUpPage()),
+  Future<void> fetchTransactionsSummary() async {
+    final url = Uri.parse('http://13.215.101.79/api/transactions');
+    final response = await http.get(
+      url,
+      headers: {'Accept': 'application/json', 'Authorization': 'Bearer $token'},
     );
+
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      final transactions = data['data'] as List;
+
+      int totalIn = 0;
+      int totalOut = 0;
+      for (var tx in transactions) {
+        int amount = int.tryParse(tx['amount'].toString()) ?? 0;
+        if (tx['type'] == 'topup') {
+          totalIn += amount;
+        } else if (tx['type'] == 'transfer') {
+          totalOut += amount;
+        }
+      }
+
+      setState(() {
+        totalTopup = totalIn;
+        totalTransfer = totalOut;
+        currentBalance = totalIn - totalOut;
+        isLoading = false;
+      });
+    }
   }
 
-  void handleTransfer() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const TransferPage()),
+  String formatCurrency(int amount) {
+    final currencyFormatter = NumberFormat.currency(
+      locale: 'id_ID',
+      symbol: 'Rp ',
+      decimalDigits: 0,
     );
-  }
-
-  void handleLogout() {
-    _logoutAndRedirect();
+    return currencyFormatter.format(amount);
   }
 
   @override
   Widget build(BuildContext context) {
-    if (isLoading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
-    }
-
     return Scaffold(
-      appBar: Bar(
-        title: 'Home',
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            tooltip: 'Logout',
-            onPressed: handleLogout,
-          ),
-        ],
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            // Saldo Card
-            Card(
-              elevation: 4,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-              color: Colors.blue[300],
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Saldo User',
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                        fontFamily: 'Poppins',
-                      ),
+      appBar: const Bar(title: 'Home'),
+      body:
+          isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : errorMessage.isNotEmpty
+              ? Center(child: Text(errorMessage))
+              : ListView(
+                padding: const EdgeInsets.all(16),
+                children: [
+                  Text(
+                    'Selamat datang, ${userName ?? 'Pengguna'}!',
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'Poppins',
                     ),
-                    const SizedBox(height: 10),
-                    Text(
-                      'Rp. $saldo',
-                      style: const TextStyle(
-                        fontSize: 20,
-                        color: Colors.white,
-                        fontFamily: 'Poppins',
-                      ),
+                  ),
+                  const SizedBox(height: 20),
+                  Card(
+                    elevation: 3,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            // Tombol Topup & Transfer
-            Row(
-              children: [
-                Expanded(
-                  child: GestureDetector(
-                    onTap: handleTopUp,
-                    child: Card(
-                      elevation: 3,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                      color: Colors.blue[100],
-                      child: SizedBox(
-                        height: 90,
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: const [
-                            Icon(Icons.add_circle_outline, size: 30, color: Colors.blue),
-                            SizedBox(height: 8),
-                            Text(
-                              'Topup',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                fontFamily: 'Poppins',
-                              ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Saldo Saat Ini',
+                            style: TextStyle(
+                              fontFamily: 'Poppins',
+                              fontWeight: FontWeight.w600,
                             ),
-                          ],
-                        ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            formatCurrency(currentBalance),
+                            style: const TextStyle(
+                              fontSize: 24,
+                              color: Colors.blueAccent,
+                              fontWeight: FontWeight.bold,
+                              fontFamily: 'Poppins',
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: GestureDetector(
-                    onTap: handleTransfer,
-                    child: Card(
-                      elevation: 3,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                      color: Colors.blue[100],
-                      child: SizedBox(
-                        height: 90,
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: const [
-                            Icon(Icons.send_outlined, size: 30, color: Colors.blue),
-                            SizedBox(height: 8),
-                            Text(
-                              'Transfer',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                fontFamily: 'Poppins',
+                  const SizedBox(height: 20),
+                  Card(
+                    elevation: 2,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text(
+                                'Total Top Up',
+                                style: TextStyle(fontFamily: 'Poppins'),
                               ),
-                            ),
-                          ],
-                        ),
+                              Text(
+                                formatCurrency(totalTopup),
+                                style: const TextStyle(
+                                  fontFamily: 'Poppins',
+                                  color: Colors.green,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text(
+                                'Total Transfer',
+                                style: TextStyle(fontFamily: 'Poppins'),
+                              ),
+                              Text(
+                                formatCurrency(totalTransfer),
+                                style: const TextStyle(
+                                  fontFamily: 'Poppins',
+                                  color: Colors.red,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
                     ),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-
-            // Search Field
-            TextField(
-              onChanged: filterBanks,
-              decoration: InputDecoration(
-                hintText: 'Cari bank...',
-                prefixIcon: const Icon(Icons.search),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
+                ],
               ),
-            ),
-            const SizedBox(height: 12),
-
-            // Daftar Bank
-            Expanded(
-              child: filteredBanks.isEmpty
-                  ? const Center(child: Text('Bank tidak ditemukan'))
-                  : ListView.separated(
-                      itemCount: filteredBanks.length,
-                      separatorBuilder: (_, __) => const Divider(height: 1),
-                      itemBuilder: (context, index) {
-                        final bank = filteredBanks[index];
-                        return ListTile(
-                          leading: Icon(
-                            bank['type'] == "bank"
-                                ? Icons.account_balance_outlined
-                                : Icons.account_balance_wallet,
-                            color: Colors.blue,
-                          ),
-                          title: Text(
-                            bank['bank_name'],
-                            style: const TextStyle(fontFamily: 'Poppins'),
-                          ),
-                          subtitle: Text(
-                            'Kode: ${bank['bank_code']}',
-                            style: const TextStyle(fontFamily: 'Poppins'),
-                          ),
-                        );
-                      },
-                    ),
-            ),
-          ],
-        ),
-      ),
-      bottomNavigationBar: const BottomBar(), 
+      bottomNavigationBar: const BottomBar(),
     );
   }
 }
