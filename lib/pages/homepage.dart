@@ -5,6 +5,8 @@ import 'package:intl/intl.dart';
 import '../widgets/bar.dart';
 import '../widgets/bottombar.dart';
 import '../services/auth_service.dart';
+import 'topuppage.dart';
+import 'transferpage.dart';
 
 class HomePage extends StatefulWidget {
   final String token;
@@ -110,109 +112,199 @@ class _HomePageState extends State<HomePage> {
     return currencyFormatter.format(amount);
   }
 
+  void handleTopup() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const TopUpPage()),
+    );
+  }
+
+  void handleTransfer() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const TransferPage()),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: const Bar(title: 'Home'),
-      body:
-          isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : errorMessage.isNotEmpty
+      body: isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : errorMessage.isNotEmpty
               ? Center(child: Text(errorMessage))
               : ListView(
-                padding: const EdgeInsets.all(16),
-                children: [
-                  Text(
-                    'Selamat datang, ${userName ?? 'Pengguna'}!',
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      fontFamily: 'Poppins',
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  Card(
-                    elevation: 3,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Saldo Saat Ini',
-                            style: TextStyle(
-                              fontFamily: 'Poppins',
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            formatCurrency(currentBalance),
-                            style: const TextStyle(
-                              fontSize: 24,
-                              color: Colors.blueAccent,
-                              fontWeight: FontWeight.bold,
-                              fontFamily: 'Poppins',
-                            ),
-                          ),
-                        ],
+                  padding: const EdgeInsets.all(16),
+                  children: [
+                    Text(
+                      'Selamat datang, ${userName ?? 'Pengguna'}!',
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: 'Poppins',
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 20),
-                  Card(
-                    elevation: 2,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              const Text(
-                                'Total Top Up',
-                                style: TextStyle(fontFamily: 'Poppins'),
+                    const SizedBox(height: 20),
+                    Card(
+                      elevation: 3,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Saldo Saat Ini',
+                              style: TextStyle(
+                                fontFamily: 'Poppins',
+                                fontWeight: FontWeight.w600,
                               ),
-                              Text(
-                                formatCurrency(totalTopup),
-                                style: const TextStyle(
-                                  fontFamily: 'Poppins',
-                                  color: Colors.green,
-                                  fontWeight: FontWeight.bold,
-                                ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              formatCurrency(currentBalance),
+                              style: const TextStyle(
+                                fontSize: 24,
+                                color: Colors.blueAccent,
+                                fontWeight: FontWeight.bold,
+                                fontFamily: 'Poppins',
                               ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              const Text(
-                                'Total Transfer',
-                                style: TextStyle(fontFamily: 'Poppins'),
-                              ),
-                              Text(
-                                formatCurrency(totalTransfer),
-                                style: const TextStyle(
-                                  fontFamily: 'Poppins',
-                                  color: Colors.red,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                ],
-              ),
+                    const SizedBox(height: 20),
+                    Card(
+                      elevation: 2,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text(
+                                  'Total Top Up',
+                                  style: TextStyle(fontFamily: 'Poppins'),
+                                ),
+                                Text(
+                                  formatCurrency(totalTopup),
+                                  style: const TextStyle(
+                                    fontFamily: 'Poppins',
+                                    color: Colors.green,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text(
+                                  'Total Transfer',
+                                  style: TextStyle(fontFamily: 'Poppins'),
+                                ),
+                                Text(
+                                  formatCurrency(totalTransfer),
+                                  style: const TextStyle(
+                                    fontFamily: 'Poppins',
+                                    color: Colors.red,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+                            // Tombol Topup dan Transfer
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: GestureDetector(
+                                    onTap: handleTopup,
+                                    child: Card(
+                                      elevation: 3,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(15),
+                                      ),
+                                      color: Colors.blue[100],
+                                      child: SizedBox(
+                                        height: 90,
+                                        child: Column(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          children: const [
+                                            Icon(
+                                              Icons.add_circle_outline,
+                                              size: 30,
+                                              color: Colors.blue,
+                                            ),
+                                            SizedBox(height: 8),
+                                            Text(
+                                              'Topup',
+                                              style: TextStyle(
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.bold,
+                                                fontFamily: 'Poppins',
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: GestureDetector(
+                                    onTap: handleTransfer,
+                                    child: Card(
+                                      elevation: 3,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(15),
+                                      ),
+                                      color: Colors.blue[100],
+                                      child: SizedBox(
+                                        height: 90,
+                                        child: Column(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          children: const [
+                                            Icon(
+                                              Icons.send_outlined,
+                                              size: 30,
+                                              color: Colors.blue,
+                                            ),
+                                            SizedBox(height: 8),
+                                            Text(
+                                              'Transfer',
+                                              style: TextStyle(
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.bold,
+                                                fontFamily: 'Poppins',
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
       bottomNavigationBar: const BottomBar(),
     );
   }

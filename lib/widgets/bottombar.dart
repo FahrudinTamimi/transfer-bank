@@ -95,15 +95,15 @@ class _BottomBarState extends State<BottomBar> {
                 );
               },
             ),
-            IconButton(
-              icon: const Icon(Icons.person),
-              onPressed: () {
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(builder: (_) => const ProfilePage()),
-                );
-              },
-            ),
+            // IconButton(
+            //   icon: const Icon(Icons.person),
+            //   onPressed: () {
+            //     Navigator.pushReplacement(
+            //       context,
+            //       MaterialPageRoute(builder: (_) => const ProfilePage()),
+            //     );
+            //   },
+            // ),
             IconButton(
               icon: const Icon(Icons.info),
               onPressed: () {

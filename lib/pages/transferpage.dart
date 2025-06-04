@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:intl/intl.dart';
 import '../widgets/bar.dart';
 import '../widgets/bottombar.dart';
 import '../services/auth_service.dart';
@@ -42,7 +43,9 @@ class _TransferPageState extends State<TransferPage> {
 
   bool isLoading = false;
   bool isCheckingAccount = false;
+  bool isLoadingBalance = true;
   String? validationMessage;
+  int currentBalance = 0;
 
   final String apiKey = dotenv.env['API_KEY'] ?? '';
 
@@ -50,6 +53,7 @@ class _TransferPageState extends State<TransferPage> {
   void initState() {
     super.initState();
     fetchBanks();
+    fetchCurrentBalance();
     _bankSearchController.addListener(_filterBanks);
     _accountController.addListener(_onAccountChanged);
   }
@@ -62,6 +66,58 @@ class _TransferPageState extends State<TransferPage> {
     _amountController.dispose();
     _descriptionController.dispose();
     super.dispose();
+  }
+
+  Future<void> fetchCurrentBalance() async {
+    final token = await AuthService.getToken();
+    if (token == null) return;
+
+    try {
+      final url = Uri.parse('http://13.215.101.79/api/transactions');
+      final response = await http.get(
+        url,
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token'
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final transactions = data['data'] as List;
+
+        int totalTopup = 0;
+        int totalTransfer = 0;
+
+        for (var tx in transactions) {
+          int amount = int.tryParse(tx['amount'].toString()) ?? 0;
+          if (tx['type'] == 'topup') {
+            totalTopup += amount;
+          } else if (tx['type'] == 'transfer') {
+            totalTransfer += amount;
+          }
+        }
+
+        setState(() {
+          currentBalance = totalTopup - totalTransfer;
+          isLoadingBalance = false;
+        });
+      }
+    } catch (e) {
+      print('Error fetching balance: $e');
+      setState(() {
+        isLoadingBalance = false;
+      });
+    }
+  }
+
+  String formatCurrency(int amount) {
+    final currencyFormatter = NumberFormat.currency(
+      locale: 'id_ID',
+      symbol: 'Rp ',
+      decimalDigits: 0,
+    );
+    return currencyFormatter.format(amount);
   }
 
   Future<void> fetchBanks() async {
@@ -192,6 +248,55 @@ class _TransferPageState extends State<TransferPage> {
       return;
     }
 
+    // Pengecekan saldo sebelum transfer
+    if (amount > currentBalance) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Saldo tidak mencukupi. Saldo saat ini: ${formatCurrency(currentBalance)}, '
+            'jumlah transfer: ${formatCurrency(amount)}'
+          )
+        ),
+      );
+      return;
+    }
+
+    // Konfirmasi transfer
+    final bool? confirm = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Konfirmasi Transfer'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Bank: ${selectedBank!.bankName}'),
+              Text('Rekening: $accountNumber'),
+              Text('Nama: $accountName'),
+              Text('Jumlah: ${formatCurrency(amount)}'),
+              if (description.isNotEmpty) Text('Deskripsi: $description'),
+              const SizedBox(height: 16),
+              Text('Saldo saat ini: ${formatCurrency(currentBalance)}'),
+              Text('Saldo setelah transfer: ${formatCurrency(currentBalance - amount)}'),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Batal'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Konfirmasi'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirm != true) return;
+
     setState(() => isLoading = true);
 
     final token = await AuthService.getToken();
@@ -204,7 +309,7 @@ class _TransferPageState extends State<TransferPage> {
     }
 
     final refId = DateTime.now().millisecondsSinceEpoch.toString();
-   final now = DateTime.now();
+    final now = DateTime.now();
     final formattedDate =
     "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')} "
     "${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}";
@@ -241,6 +346,8 @@ class _TransferPageState extends State<TransferPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Transfer berhasil')),
         );
+        
+        // Reset form
         _bankSearchController.clear();
         _accountController.clear();
         _nameController.clear();
@@ -251,6 +358,13 @@ class _TransferPageState extends State<TransferPage> {
           filteredBanks = banks;
           validationMessage = null;
         });
+
+        // Update saldo setelah transfer berhasil
+        await fetchCurrentBalance();
+        
+        // Kembali ke halaman sebelumnya atau refresh data
+        Navigator.of(context).pop(true);
+        
       } else {
         final data = jsonDecode(response.body);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -277,6 +391,44 @@ class _TransferPageState extends State<TransferPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Tampilkan saldo saat ini
+              Card(
+                elevation: 2,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Saldo Saat Ini:',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      isLoadingBalance
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : Text(
+                              formatCurrency(currentBalance),
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.blueAccent,
+                              ),
+                            ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              
               const Text('Pilih Bank:', style: TextStyle(fontWeight: FontWeight.bold)),
               TextField(
                 controller: _bankSearchController,
@@ -371,7 +523,15 @@ class _TransferPageState extends State<TransferPage> {
                   prefixText: 'Rp ',
                   labelText: 'Nominal Transfer',
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(15)),
+                  helperText: 'Maksimal: ${formatCurrency(currentBalance)}',
                 ),
+                onChanged: (value) {
+                  // Optional: Real-time validation
+                  final amount = int.tryParse(value);
+                  if (amount != null && amount > currentBalance) {
+                    // Could show warning here
+                  }
+                },
               ),
               const SizedBox(height: 10),
               TextField(
@@ -385,7 +545,7 @@ class _TransferPageState extends State<TransferPage> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
-                  onPressed: isLoading ? null : submitTransfer,
+                  onPressed: (isLoading || isLoadingBalance) ? null : submitTransfer,
                   icon: isLoading
                       ? const SizedBox(
                           width: 24,
