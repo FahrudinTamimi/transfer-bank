@@ -85,6 +85,8 @@ class _HomePageState extends State<HomePage> {
 
       int totalIn = 0;
       int totalOut = 0;
+      int latestFinal = 0;
+
       for (var tx in transactions) {
         int amount = int.tryParse(tx['amount'].toString()) ?? 0;
         if (tx['type'] == 'topup') {
@@ -94,10 +96,20 @@ class _HomePageState extends State<HomePage> {
         }
       }
 
+      // Saldo sekarang diambil dari kolom 'final' transaksi terakhir
+      if (transactions.isNotEmpty) {
+        latestFinal = int.tryParse(transactions.last['current'].toString()) ?? 0;
+      }
+
       setState(() {
         totalTopup = totalIn;
         totalTransfer = totalOut;
-        currentBalance = totalIn - totalOut;
+        currentBalance = latestFinal;
+        isLoading = false;
+      });
+    } else {
+      setState(() {
+        errorMessage = 'Gagal mengambil data transaksi.';
         isLoading = false;
       });
     }
@@ -126,10 +138,26 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  void handleLogout() async {
+    await AuthService.logout();
+    Navigator.pushReplacementNamed(context, '/login');
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: const Bar(title: 'Home'),
+      appBar: AppBar(
+        title: const Text('Home'),
+        backgroundColor: Colors.blue, // sesuai warna bar.dart
+        foregroundColor: Colors.white, // teks putih
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: handleLogout,
+            tooltip: 'Logout',
+          )
+        ],
+      ),
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
           : errorMessage.isNotEmpty
@@ -137,15 +165,6 @@ class _HomePageState extends State<HomePage> {
               : ListView(
                   padding: const EdgeInsets.all(16),
                   children: [
-                    Text(
-                      'Selamat datang, ${userName ?? 'Pengguna'}!',
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        fontFamily: 'Poppins',
-                      ),
-                    ),
-                    const SizedBox(height: 20),
                     Card(
                       elevation: 3,
                       shape: RoundedRectangleBorder(
@@ -154,7 +173,7 @@ class _HomePageState extends State<HomePage> {
                       child: Padding(
                         padding: const EdgeInsets.all(16),
                         child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                          crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
                             const Text(
                               'Saldo Saat Ini',
@@ -172,6 +191,7 @@ class _HomePageState extends State<HomePage> {
                                 fontWeight: FontWeight.bold,
                                 fontFamily: 'Poppins',
                               ),
+                              textAlign: TextAlign.center,
                             ),
                           ],
                         ),
@@ -223,7 +243,6 @@ class _HomePageState extends State<HomePage> {
                               ],
                             ),
                             const SizedBox(height: 16),
-                            // Tombol Topup dan Transfer
                             Row(
                               children: [
                                 Expanded(

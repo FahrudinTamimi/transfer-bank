@@ -99,7 +99,7 @@ class _TransferPageState extends State<TransferPage> {
         }
 
         setState(() {
-          currentBalance = totalTopup - totalTransfer;
+          currentBalance = data["current"] ?? 0;
           isLoadingBalance = false;
         });
       }
@@ -249,17 +249,17 @@ class _TransferPageState extends State<TransferPage> {
     }
 
     // Pengecekan saldo sebelum transfer
-    if (amount > currentBalance) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Saldo tidak mencukupi. Saldo saat ini: ${formatCurrency(currentBalance)}, '
-            'jumlah transfer: ${formatCurrency(amount)}'
-          )
-        ),
-      );
-      return;
-    }
+    // if (amount > currentBalance) {
+    //   ScaffoldMessenger.of(context).showSnackBar(
+    //     SnackBar(
+    //       content: Text(
+    //         'Saldo tidak mencukupi. Saldo saat ini: ${formatCurrency(currentBalance)}, '
+    //         'jumlah transfer: ${formatCurrency(amount)}'
+    //       )
+    //     ),
+    //   );
+    //   return;
+    // }
 
     // Konfirmasi transfer
     final bool? confirm = await showDialog<bool>(
@@ -277,8 +277,8 @@ class _TransferPageState extends State<TransferPage> {
               Text('Jumlah: ${formatCurrency(amount)}'),
               if (description.isNotEmpty) Text('Deskripsi: $description'),
               const SizedBox(height: 16),
-              Text('Saldo saat ini: ${formatCurrency(currentBalance)}'),
-              Text('Saldo setelah transfer: ${formatCurrency(currentBalance - amount)}'),
+              // Text('Saldo saat ini: ${formatCurrency(currentBalance)}'),
+              // Text('Saldo setelah transfer: ${formatCurrency(currentBalance - amount)}'),
             ],
           ),
           actions: [
@@ -392,41 +392,41 @@ class _TransferPageState extends State<TransferPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Tampilkan saldo saat ini
-              Card(
-                elevation: 2,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'Saldo Saat Ini:',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      isLoadingBalance
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : Text(
-                              formatCurrency(currentBalance),
-                              style: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.blueAccent,
-                              ),
-                            ),
-                    ],
-                  ),
-                ),
-              ),
+              // Card(
+              //   elevation: 2,
+              //   shape: RoundedRectangleBorder(
+              //     borderRadius: BorderRadius.circular(12),
+              //   ),
+              //   child: Padding(
+              //     padding: const EdgeInsets.all(16),
+              //     child: Row(
+              //       mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              //       children: [
+              //         const Text(
+              //           'Saldo Saat Ini:',
+              //           style: TextStyle(
+              //             fontSize: 16,
+              //             fontWeight: FontWeight.w600,
+              //           ),
+              //         ),
+              //         isLoadingBalance
+              //             ? const SizedBox(
+              //                 width: 20,
+              //                 height: 20,
+              //                 child: CircularProgressIndicator(strokeWidth: 2),
+              //               )
+              //             : Text(
+              //                 formatCurrency(currentBalance),
+              //                 style: const TextStyle(
+              //                   fontSize: 18,
+              //                   fontWeight: FontWeight.bold,
+              //                   color: Colors.blueAccent,
+              //                 ),
+              //               ),
+              //       ],
+              //     ),
+              //   ),
+              // ),
               const SizedBox(height: 20),
               
               const Text('Pilih Bank:', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -523,7 +523,7 @@ class _TransferPageState extends State<TransferPage> {
                   prefixText: 'Rp ',
                   labelText: 'Nominal Transfer',
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(15)),
-                  helperText: 'Maksimal: ${formatCurrency(currentBalance)}',
+                  // helperText: 'Maksimal: ${formatCurrency(currentBalance)}',
                 ),
                 onChanged: (value) {
                   // Optional: Real-time validation
